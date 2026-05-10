@@ -1,15 +1,4 @@
 import os
-import time
-import threading
-import hashlib
-import sqlite3
-import smtplib
-import schedule
-import requests
-from datetime import datetime
-from bs4 import BeautifulSoup
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 
@@ -34,4 +23,4 @@ def leads():
     return jsonify({'leads': [], 'total': 0, 'status': 'online'})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=PORT)from az_pipeline_scraper import app
+    app.run(host='0.0.0.0', port=PORT)
