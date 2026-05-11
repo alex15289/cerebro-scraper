@@ -1,5 +1,4 @@
 
-
 """
 CEREBRO — Arizona Statewide Pipeline Scraper + API
 Empire Housing Solutions — empiresolutions520@gmail.com
@@ -130,31 +129,28 @@ def push_to_dealmachine():
     if not leads:  return jsonify({'error':'No leads'}), 400
 
     pushed=0; failed=0; errors=[]
-    dm_url = 'https://api.dealmachine.com/partner/lead'
+    dm_url = 'https://api.dealmachine.com/public/v1/leads/'
 
     for lead in leads:
         addr = lead.get('address','').strip()
         if not addr or len(addr) < 5: continue
         try:
+            # DealMachine requires multipart form-data NOT JSON
             r = requests.post(dm_url,
-                headers={'Authorization':f'Bearer {dm_key}','Content-Type':'application/json'},
-                json={
-                    'address_type': 1,
-                    'full_address': addr,
-                    'notes': f"CEREBRO — {lead.get('type','lead')} | Score: {lead.get('score',75)}"[:200]
-                },
+                headers={'Authorization': f'Bearer {dm_key}'},
+                data={'full_address': addr},  # form-data
                 timeout=10
             )
-            if r.status_code in (200,201,422):
+            if r.status_code in (200, 201, 422):
                 pushed += 1  # 422 = already exists, still counts
             else:
                 failed += 1
                 if r.status_code == 401:
                     return jsonify({'error':'Invalid DealMachine API key','pushed':pushed,'failed':failed}), 401
-                errors.append(f"{addr}: {r.status_code}")
+                errors.append(f"{addr[:30]}: HTTP {r.status_code}")
         except Exception as e:
             failed += 1
-            errors.append(f"{addr}: {str(e)}")
+            errors.append(f"{addr[:30]}: {str(e)[:50]}")
         time.sleep(0.12)  # Stay under 10/sec rate limit
 
     log(f'DealMachine push: {pushed} sent, {failed} failed', 'ok' if pushed>0 else 'err')
