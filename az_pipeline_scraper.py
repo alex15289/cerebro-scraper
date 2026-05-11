@@ -392,7 +392,6 @@ def push_dealmachine():
             continue
 
         payload = {
-            "addressType": 3,
             "address": address,
             "city": city,
             "state": state,
@@ -401,8 +400,8 @@ def push_dealmachine():
 
         try:
             resp = requests.post(
-                "https://public-api.dealmachine.com/lead",
-                json=payload,
+                "https://api.dealmachine.com/public/v1/leads/",
+                data=payload,
                 headers=headers,
                 timeout=10,
             )
