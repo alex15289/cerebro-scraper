@@ -1,4 +1,4 @@
-
+ 
 """
 CEREBRO — Arizona Statewide Pipeline Scraper + API
 Empire Housing Solutions — empiresolutions520@gmail.com
@@ -364,7 +364,7 @@ def push_dealmachine():
         return jsonify({}), 200
 
     data = request.get_json(force=True)
-    api_key = data.get("api_key", "").strip()
+    api_key = data.get("api_key", "").strip() or data.get("dm_key", "").strip() or "2pB99rf466Dj3M2WTJTFgWJdrBwN4GnD790WgCr4"", "").strip() or data.get("dm_key", "").strip() or "2pB99rf466Dj3M2WTJTFgWJdrBwN4GnD790WgCr4"", "").strip()
     leads   = data.get("leads", [])
 
     if not api_key:
