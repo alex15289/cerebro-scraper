@@ -358,3 +358,64 @@ if __name__=='__main__':
     threading.Thread(target=run_scrape,daemon=True).start()
     threading.Thread(target=scheduler,daemon=True).start()
     app.run(host='0.0.0.0',port=PORT,debug=False)
+@app.route("/push-dealmachine", methods=["POST", "OPTIONS"])
+def push_dealmachine():
+    if request.method == "OPTIONS":
+        return jsonify({}), 200
+
+    data = request.get_json(force=True)
+    api_key = data.get("api_key", "").strip()
+    leads   = data.get("leads", [])
+
+    if not api_key:
+        return jsonify({"error": "Missing api_key"}), 400
+    if not leads:
+        return jsonify({"error": "No leads provided"}), 400
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+
+    results = []
+    pushed = failed = skipped = 0
+
+    for lead in leads:
+        address = (lead.get("address") or "").strip()
+        city    = (lead.get("city")    or "").strip()
+        state   = (lead.get("state")   or "AZ").strip()
+        zip_    = (lead.get("zip")     or "").strip()
+
+        if not address or not city or not zip_:
+            skipped += 1
+            results.append({**lead, "status": "skip", "msg": "Missing fields"})
+            continue
+
+        payload = {
+            "addressType": 3,
+            "address": address,
+            "city": city,
+            "state": state,
+            "zip": zip_,
+        }
+
+        try:
+            resp = requests.post(
+                "https://public-api.dealmachine.com/lead",
+                json=payload,
+                headers=headers,
+                timeout=10,
+            )
+            if resp.status_code in (200, 201):
+                pushed += 1
+                results.append({**lead, "status": "pushed", "msg": "OK"})
+            else:
+                failed += 1
+                results.append({**lead, "status": "error", "msg": f"HTTP {resp.status_code}: {resp.text[:100]}"})
+        except Exception as e:
+            failed += 1
+            results.append({**lead, "status": "error", "msg": str(e)[:100]})
+
+        time.sleep(0.12)
+
+    return jsonify({"total": len(leads), "pushed": pushed, "failed": failed, "skipped": skipped, "results": results})
