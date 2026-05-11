@@ -1,3 +1,4 @@
+
 """
 CEREBRO — Arizona Statewide Pipeline Scraper + API
 Empire Housing Solutions — empiresolutions520@gmail.com
@@ -116,6 +117,47 @@ def update_lead(lid):
         conn=init_db(); sc=', '.join(f'{k}=?' for k in allowed)
         conn.execute(f'UPDATE leads SET {sc},updated=? WHERE id=?',list(allowed.values())+[datetime.now().isoformat(),lid]); conn.commit(); conn.close()
     return jsonify({'status':'updated','id':lid})
+
+@app.route('/push-to-dealmachine', methods=['POST'])
+def push_to_dealmachine():
+    """Proxy endpoint — pushes leads to DealMachine API server-side (bypasses CORS)"""
+    if not auth(request): return jsonify({'error':'Unauthorized'}), 401
+    data = request.get_json()
+    dm_key = data.get('dm_key','')
+    leads  = data.get('leads', [])
+    if not dm_key: return jsonify({'error':'No DealMachine API key'}), 400
+    if not leads:  return jsonify({'error':'No leads'}), 400
+
+    pushed=0; failed=0; errors=[]
+    dm_url = 'https://api.dealmachine.com/partner/lead'
+
+    for lead in leads:
+        addr = lead.get('address','').strip()
+        if not addr or len(addr) < 5: continue
+        try:
+            r = requests.post(dm_url,
+                headers={'Authorization':f'Bearer {dm_key}','Content-Type':'application/json'},
+                json={
+                    'address_type': 1,
+                    'full_address': addr,
+                    'notes': f"CEREBRO — {lead.get('type','lead')} | Score: {lead.get('score',75)}"[:200]
+                },
+                timeout=10
+            )
+            if r.status_code in (200,201,422):
+                pushed += 1  # 422 = already exists, still counts
+            else:
+                failed += 1
+                if r.status_code == 401:
+                    return jsonify({'error':'Invalid DealMachine API key','pushed':pushed,'failed':failed}), 401
+                errors.append(f"{addr}: {r.status_code}")
+        except Exception as e:
+            failed += 1
+            errors.append(f"{addr}: {str(e)}")
+        time.sleep(0.12)  # Stay under 10/sec rate limit
+
+    log(f'DealMachine push: {pushed} sent, {failed} failed', 'ok' if pushed>0 else 'err')
+    return jsonify({'pushed':pushed,'failed':failed,'total':len(leads),'errors':errors[:5],'status':'ok' if pushed>0 else 'error'})
 
 def init_db():
     conn=sqlite3.connect(DB_PATH); conn.row_factory=sqlite3.Row
